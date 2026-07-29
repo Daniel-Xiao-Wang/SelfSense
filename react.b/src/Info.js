@@ -1,63 +1,79 @@
-import { useEffect, useState } from 'react';
-import Button from '@mui/material/Button';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import Container from '@mui/material/Container';
-import Alert from '@mui/material/Alert';
-import Grid from '@mui/material/Unstable_Grid2'; // Grid version 2
+import { Link } from "react-router-dom";
+import "./App.css";
 
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Divider from '@mui/material/Divider';
-
-//const AllSupportedSyptoms = ["Sym1", "Sym2", "Sym3", "Sym4", "Sym5"];
-const backendBaseUrl = "http://127.0.0.1:5000"
-
-
-
-// Info page
 function Info() {
-
-  // Container that holds all the text and home botton
   return (
-    <Container maxWidth="xl">
+    <div className="page info-page">
+      <div className="atmosphere" aria-hidden="true">
+        <span className="orb orb-a" />
+        <span className="orb orb-b" />
+        <span className="grid-wash" />
+      </div>
 
-      <Grid container direction="column" justifyContent="flex-start" alignItems="center" spacing={2}>
-        
-        <Grid container direction="row" spacing={1} justifyContent="flex-start" alignItems="baseline">
+      <header className="topbar">
+        <Link to="/" className="brand-mark">
+          SelfSense
+        </Link>
+        <nav className="nav">
+          <Link to="/">Back to diagnose</Link>
+        </nav>
+      </header>
 
-          <Grid>
-            <h1>Info</h1>
-          </Grid>
+      <main className="shell">
+        <section className="hero">
+          <p className="eyebrow">About the demo</p>
+          <h1 className="brand">How it works</h1>
+          <p className="lede">
+            SelfSense turns a short symptom list into a consensus prediction
+            from three classifiers, then keeps only conditions that actually
+            co-occur with those symptoms in the training data.
+          </p>
+        </section>
 
-          <Grid>
-            <Button variant="outlined" href="/" size="small" >Home</Button>
-          </Grid>
+        <section className="info-panel">
+          <div className="info-head">
+            <h2>Using the app</h2>
+          </div>
+          <ol className="info-steps">
+            <li>Search for a symptom and select it from the suggestions.</li>
+            <li>Add up to eight symptoms that best match what you feel.</li>
+            <li>Remove any chip to refine the list before diagnosing.</li>
+            <li>Click Diagnose to compare the model predictions.</li>
+            <li>
+              Percentages show how often the models agreed on each condition.
+            </li>
+          </ol>
+        </section>
 
-        </Grid>
-
-        <Grid justifyContent="center">
-          <h3>How To Use</h3>
-          <div>1. Click on the drop-down menu and select any symptom.</div>
-          <div>2. Click the Add button to add another drop-down menu to select another symptom.</div>
-          <div>3. Click the Remove button to remove a drop-down menu.</div>
-          <div>4. Make sure that every drop-down menu has a symptom before the generation.</div>
-          <div>5. Click generate to produce a result.</div>
-          <div>6. The result will be a percentage which means the ammount of classifiers aggreing with ur diagnoses.</div>
-        </Grid>
-
-        <Grid justifyContent="center">
-            <h3>How It Works</h3>
-            <div>My program uses Machine learning to diagnose certain inputed symptoms from the user. I have decided to use the three classifiers, Random Forest Classifier, Support Vector Classifier, and Gaussian Naive Bayes Classifier. </div>
-        </Grid>
-
-      </Grid>
-    </Container>
+        <section className="info-panel">
+          <div className="info-head">
+            <h2>Under the hood</h2>
+          </div>
+          <p className="info-copy">
+            Training data maps symptom patterns to prognoses. At request time,
+            SelfSense fits three classifiers and returns both individual
+            predictions and a combined view.
+          </p>
+          <div className="info-models">
+            <div>
+              <strong>Random Forest</strong>
+              <span>Ensemble of decision trees for robust pattern matching.</span>
+            </div>
+            <div>
+              <strong>Gaussian Naive Bayes</strong>
+              <span>Probabilistic baseline that handles sparse symptom vectors.</span>
+            </div>
+            <div>
+              <strong>Logistic Regression</strong>
+              <span>
+                Calibrated multi-class baseline that behaves better on sparse
+                symptom vectors than the old SVM.
+              </span>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
 

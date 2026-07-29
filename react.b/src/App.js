@@ -1,245 +1,368 @@
-import { useEffect, useState } from 'react';
-import Button from '@mui/material/Button';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import Container from '@mui/material/Container';
-import Alert from '@mui/material/Alert';
-import Grid from '@mui/material/Unstable_Grid2'; // Grid version 2
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import "./App.css";
 
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Divider from '@mui/material/Divider';
-
-//const AllSupportedSyptoms = ["Sym1", "Sym2", "Sym3", "Sym4", "Sym5"];
-const backendBaseUrl = "http://127.0.0.1:5000"
+const backendBaseUrl = "http://127.0.0.1:5000";
 const MAX_SYMPTOMS_COUNT = 8;
 
-
-
-// Home page
 function App() {
-  const [symptoms, setSymptoms] = useState([]);
-  const [alertText, setAlertText] = useState();
-  const [alertMode, setAlertMode] = useState("success");
-  const [AllSupportedSyptoms, setAllSupportedSyptoms] = useState([]);
-  const [results, setResults] = useState();
+  const [allSymptoms, setAllSymptoms] = useState([]);
+  const [selected, setSelected] = useState([]);
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const [results, setResults] = useState(null);
+  const [rawResult, setRawResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(true);
+  const [error, setError] = useState("");
+  const searchRef = useRef(null);
+  const listRef = useRef(null);
 
-
-
-  // fetchSymptomsList function returns a json with all the symmptoms
-  const fetchSymptomsList = () => {
-    fetch(`${backendBaseUrl}/symptoms`)
-      .then(response => {
-        return response.json()
-      })
-      .then(data => {
-        setAllSupportedSyptoms(data)
-      })
-  }
-
-
-
-  // fetchSymptomsList function returns a json with all the symmptoms
-  const fetchDignoseResult = (symps) => {
-    fetch(`${backendBaseUrl}/generate/${symps}`)
-      .then(response => {
-        return response.json()
-      })
-      .then(data => {
-        setAlertText(JSON.stringify(data, null, 4))
-        const l = data.diseases.length
-        const percent = 1 / l;
-        const d = {}
-        data.diseases.forEach(i => {
-          if (d[i]) {
-            d[i] += percent
-          } else {
-            d[i] = percent
-          }
-        });
-
-        setResults(d);
-        console.log("results:", d)
-      })
-  }
-
-
-
-  // useEffect() is called when the page needs to be re-rendered
   useEffect(() => {
-    fetchSymptomsList()
-    if (symptoms.length === 0) {
-      setSymptoms([-1]);
-    }
-  }, [symptoms.length]);
+    setListLoading(true);
+    fetch(`${backendBaseUrl}/symptoms`)
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not load symptoms");
+        return response.json();
+      })
+      .then((data) => {
+        setAllSymptoms(Array.isArray(data) ? data : []);
+        setError("");
+      })
+      .catch(() => {
+        setError(
+          "Could not reach the backend. Make sure Flask is running on port 5000."
+        );
+      })
+      .finally(() => setListLoading(false));
+  }, []);
 
-
-
-  // onSelectSymptom function adds the selected symptom from user to an array
-  const onSelectSymptom = (index, e) => {
-    const v = e.target.value;
-    const exist = symptoms.find(i => i === v);
-    if (exist) {
-      alert(`${AllSupportedSyptoms[v]} is already chosen!`)
-      return;
-    }
-    const newsymp = [...symptoms];
-    newsymp[index] = v;
-    setSymptoms(newsymp);
-    setResults()
-    setAlertText()
-  }
-
-
-
-  // onAddSymptoms function that adds a drop-down menu when user clicks "add" button
-  const onAddSymptoms = () => {
-    if (symptoms.length < MAX_SYMPTOMS_COUNT) {
-      const newsymp = [...symptoms];
-      newsymp.push(-1)
-      setSymptoms(newsymp);
-      setAlertText()
-    } else {
-      setAlertText(`Max of ${MAX_SYMPTOMS_COUNT} symptoms!`)
-      setAlertMode("error")
-      return;
-    }
-  }
-
-
-
-  // onDeleteSymptoms function that deletes a drop-down menu when user clicks "delete" button
-  const onDeleteSymptoms = () => {
-    const newsymp = [...symptoms];
-    newsymp.pop()
-    setSymptoms(newsymp);
-    setAlertText()
-  }
-
-
-
-  // onSubmit function that returns the diagnostic when user clicks "generate" button
-  const onSubmit = () => {
-    const exist = symptoms.find(i => i < 0);
-    if (exist) {
-      //alert("Please choose all the symptoms first!")
-      setAlertText("Please choose all the symptoms first!")
-      setAlertMode("error")
-      return;
+  useEffect(() => {
+    const onClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
     };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
-    const ss = symptoms.map(i => AllSupportedSyptoms[i]);
+  const suggestions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allSymptoms
+      .filter((symptom) => !selected.includes(symptom))
+      .filter((symptom) => (q ? symptom.toLowerCase().includes(q) : true))
+      .slice(0, 8);
+  }, [allSymptoms, selected, query]);
 
-    fetchDignoseResult(ss)
+  useEffect(() => {
+    setHighlight(0);
+  }, [query, isOpen]);
 
-    //setAlertText(`${ss}`)
-    //setAlertMode("success")
+  const addSymptom = (symptom) => {
+    if (!symptom || selected.includes(symptom)) return;
+    if (selected.length >= MAX_SYMPTOMS_COUNT) {
+      setError(`You can select up to ${MAX_SYMPTOMS_COUNT} symptoms.`);
+      return;
+    }
+    setSelected((prev) => [...prev, symptom]);
+    setQuery("");
+    setIsOpen(false);
+    setResults(null);
+    setRawResult(null);
+    setError("");
+  };
 
-  }
+  const removeSymptom = (symptom) => {
+    setSelected((prev) => prev.filter((item) => item !== symptom));
+    setResults(null);
+    setRawResult(null);
+    setError("");
+  };
 
+  const clearAll = () => {
+    setSelected([]);
+    setResults(null);
+    setRawResult(null);
+    setError("");
+    setQuery("");
+  };
 
+  const onKeyDown = (event) => {
+    if (!isOpen && (event.key === "ArrowDown" || event.key === "Enter")) {
+      setIsOpen(true);
+      return;
+    }
 
-  // renderSymptomDropdown function is what puts the drop-down menus into display
-  // so the user can see it
-  const renderSymptomDropdown = (value, index) => {
-    const label = "Please select symptom";
-    const id = `select-${index}`;
-    const labelid = `select-label-${index}`;
-    return (
-      <Grid container>
-        <FormControl required sx={{ m: 1, minWidth: 200 }} size="small">
-          <InputLabel id={labelid}>{label}</InputLabel>
-          <Select
-            labelId={labelid}
-            id={id}
-            value={value}
-            label={label}
-            onChange={(e) => { onSelectSymptom(index, e); }}
-          >
-            {
-              AllSupportedSyptoms.map((s, i) => {
-                return <MenuItem value={i}>{s}</MenuItem>
-              })
-            }
-          </Select>
-        </FormControl>
-      </Grid>
-    )
-  }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setHighlight((prev) =>
+        suggestions.length ? (prev + 1) % suggestions.length : 0
+      );
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setHighlight((prev) =>
+        suggestions.length
+          ? (prev - 1 + suggestions.length) % suggestions.length
+          : 0
+      );
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (suggestions[highlight]) addSymptom(suggestions[highlight]);
+    } else if (event.key === "Escape") {
+      setIsOpen(false);
+    } else if (event.key === "Backspace" && !query && selected.length) {
+      removeSymptom(selected[selected.length - 1]);
+    }
+  };
 
+  const diagnose = async () => {
+    if (!selected.length) {
+      setError("Add at least one symptom to run a diagnosis.");
+      return;
+    }
 
+    setLoading(true);
+    setError("");
+    setResults(null);
+    setRawResult(null);
 
-  // Container that contains and displays all the drop-down menus, add button, remove button...
+    try {
+      const path = selected.map(encodeURIComponent).join(",");
+      const response = await fetch(`${backendBaseUrl}/generate/${path}`);
+      if (!response.ok) throw new Error("Diagnosis request failed");
+      const data = await response.json();
+
+      let ranked;
+      if (Array.isArray(data.ranked) && data.ranked.length) {
+        ranked = data.ranked.map(({ name, score }) => ({
+          name,
+          score: Number(score),
+        }));
+      } else {
+        const votes = [
+          data.rf_model_prediction,
+          data.naive_bayes_prediction,
+          data.svm_model_prediction,
+        ].filter(Boolean);
+        const tallies = {};
+        votes.forEach((name) => {
+          tallies[name] = (tallies[name] || 0) + 1 / votes.length;
+        });
+        ranked = Object.entries(tallies)
+          .map(([name, score]) => ({ name, score }))
+          .sort((a, b) => b.score - a.score);
+      }
+
+      setResults(ranked);
+      setRawResult(data);
+    } catch {
+      setError("Something went wrong while generating a diagnosis.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Container maxWidth="xl">
-      <Grid container direction="column" justifyContent="flex-start" alignItems="center" spacing={2}>
-        <Grid container direction="row" spacing={1} justifyContent="flex-start" alignItems="baseline">
-          <Grid>
-            <h2>An AI Doctor Demo</h2>
-          </Grid>
-          <Grid>
-            <Button variant="outlined" href="info" size="small" >Info</Button>
-          </Grid>
-        </Grid>
-        <Grid>
-          <h3>1. Choose the Symptoms</h3>
-        </Grid>
-        <Grid container direction="row" spacing={6}>
-          <Grid container direction="column" alignItems="flex-start" spacing={2}>
-            {
-              symptoms.map((i, j) => renderSymptomDropdown(i, j))
-            }
-          </Grid>
-          <Grid container direction="column" justifyContent="flex-start" alignItems="flex-start" spacing={2}>
-            <Grid>
-              <Button variant="contained" onClick={onAddSymptoms}>Add</Button>
-            </Grid>
-            {
-              symptoms.length > 1 && <Grid>
-                <Button variant="contained" onClick={onDeleteSymptoms}>Delete</Button>
-              </Grid>
-            }
-          </Grid>
-        </Grid>
-        <Grid>
-          <h3>2. Click Diagnose to generate the results</h3>
-        </Grid>
-        <Grid>
-          <Button type="submit" variant="outlined" onClick={onSubmit}>Diagnose</Button>
-        </Grid>
-        {results && <Grid>
-          <List
-            sx={{
-              width: '100%',
-              maxWidth: 360,
-              bgcolor: 'background.paper',
-              position: 'relative',
-              overflow: 'auto',
-              maxHeight: 300,
-              '& ul': { padding: 0 },
-            }}
-            subheader={<li />}
-          >
-            {Object.keys(results).map(i => {
-              return <ListItem key={`item-${i}`}>
-                <ListItemText primary={`${i} - ${(results[i] * 100).toFixed(2)}%`} />
-              </ListItem>
-            })}
-          </List>
+    <div className="page">
+      <div className="atmosphere" aria-hidden="true">
+        <span className="orb orb-a" />
+        <span className="orb orb-b" />
+        <span className="grid-wash" />
+      </div>
 
-        </Grid>}
-        <Grid>
-          {alertText && <Alert severity={alertMode}>
-            {alertText}
-          </Alert>}
-        </Grid>
-      </Grid>
-    </Container>
+      <header className="topbar">
+        <Link to="/" className="brand-mark">
+          SelfSense
+        </Link>
+        <nav className="nav">
+          <Link to="/info">How it works</Link>
+        </nav>
+      </header>
+
+      <main className="shell">
+        <section className="hero">
+          <p className="eyebrow">Symptom-guided screening</p>
+          <h1 className="brand">SelfSense</h1>
+          <p className="lede">
+            Search what you feel, build a short symptom list, and get a
+            model-backed read of likely conditions.
+          </p>
+        </section>
+
+        <section className="workspace" aria-label="Symptom search">
+          <div className="workspace-head">
+            <div>
+              <h2>Your symptoms</h2>
+              <p>
+                {selected.length}/{MAX_SYMPTOMS_COUNT} selected
+                {listLoading ? " · loading catalog…" : ""}
+              </p>
+            </div>
+            {selected.length > 0 && (
+              <button type="button" className="text-btn" onClick={clearAll}>
+                Clear all
+              </button>
+            )}
+          </div>
+
+          <div className="search-block" ref={searchRef}>
+            <label className="search-label" htmlFor="symptom-search">
+              Search symptoms
+            </label>
+            <div className={`search-field ${isOpen ? "is-open" : ""}`}>
+              <svg
+                className="search-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="M20 20l-3.5-3.5" />
+              </svg>
+              <input
+                id="symptom-search"
+                type="search"
+                autoComplete="off"
+                placeholder={
+                  selected.length >= MAX_SYMPTOMS_COUNT
+                    ? "Maximum symptoms reached"
+                    : "Try fever, cough, itching…"
+                }
+                value={query}
+                disabled={
+                  listLoading || selected.length >= MAX_SYMPTOMS_COUNT
+                }
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setIsOpen(true);
+                }}
+                onFocus={() => setIsOpen(true)}
+                onKeyDown={onKeyDown}
+              />
+            </div>
+
+            {isOpen && suggestions.length > 0 && (
+              <ul className="suggestions" role="listbox" ref={listRef}>
+                {suggestions.map((symptom, index) => (
+                  <li key={symptom}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={index === highlight}
+                      className={index === highlight ? "is-active" : ""}
+                      onMouseEnter={() => setHighlight(index)}
+                      onClick={() => addSymptom(symptom)}
+                    >
+                      <span>{symptom}</span>
+                      <em>Add</em>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {isOpen && query && suggestions.length === 0 && (
+              <div className="empty-search">No matching symptoms.</div>
+            )}
+          </div>
+
+          <div className="chip-row" aria-live="polite">
+            {selected.length === 0 ? (
+              <p className="chip-empty">
+                No symptoms yet. Start typing above to add one.
+              </p>
+            ) : (
+              selected.map((symptom, index) => (
+                <button
+                  key={symptom}
+                  type="button"
+                  className="chip"
+                  style={{ animationDelay: `${index * 40}ms` }}
+                  onClick={() => removeSymptom(symptom)}
+                  aria-label={`Remove ${symptom}`}
+                >
+                  {symptom}
+                  <span aria-hidden="true">×</span>
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="actions">
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={diagnose}
+              disabled={loading || !selected.length}
+            >
+              {loading ? "Diagnosing…" : "Diagnose"}
+            </button>
+            <p className="hint">
+              Ensemble of Random Forest, Naive Bayes, and Logistic Regression.
+            </p>
+          </div>
+
+          {error && (
+            <div className="banner banner-error" role="alert">
+              {error}
+            </div>
+          )}
+        </section>
+
+        {results && (
+          <section className="results" aria-live="polite">
+            <div className="results-head">
+              <h2>Likely conditions</h2>
+              <p>
+                Agreement across the three models for your selected symptoms.
+              </p>
+            </div>
+
+            <ol className="result-list">
+              {results.map(({ name, score }, index) => (
+                <li
+                  key={name}
+                  className="result-item"
+                  style={{ animationDelay: `${index * 80}ms` }}
+                >
+                  <div className="result-meta">
+                    <strong>{name}</strong>
+                    <span>{(score * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="meter" aria-hidden="true">
+                    <span style={{ width: `${Math.max(score * 100, 8)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            {rawResult && (
+              <details className="model-breakdown">
+                <summary>Model breakdown</summary>
+                <ul>
+                  <li>
+                    <span>Random Forest</span>
+                    <strong>{rawResult.rf_model_prediction}</strong>
+                  </li>
+                  <li>
+                    <span>Naive Bayes</span>
+                    <strong>{rawResult.naive_bayes_prediction}</strong>
+                  </li>
+                  <li>
+                    <span>Logistic Regression</span>
+                    <strong>
+                      {rawResult.logistic_regression_prediction ||
+                        rawResult.svm_model_prediction}
+                    </strong>
+                  </li>
+                </ul>
+              </details>
+            )}
+          </section>
+        )}
+      </main>
+    </div>
   );
 }
 

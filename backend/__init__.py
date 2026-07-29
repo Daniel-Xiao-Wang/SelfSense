@@ -6,6 +6,16 @@ from flask_cors import CORS
 from .endpoints.info import get_info
 from ml.diagnose import Diagnosor
 
+_diagnostic = None
+
+
+def get_diagnostic():
+    """Reuse one trained Diagnosor instance across requests."""
+    global _diagnostic
+    if _diagnostic is None:
+        _diagnostic = Diagnosor()
+    return _diagnostic
+
 
 def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
@@ -34,15 +44,16 @@ def create_app(test_config=None):
     # /symptoms endpoint for displaying the symptoms
     @app.route("/symptoms")
     def symptoms():
-        diagnostic = Diagnosor()
+        diagnostic = get_diagnostic()
         result = diagnostic.getSymptoms()
         return result
 
     # /generate endpoint for returning the diagnostic
-    @app.route("/generate/<symptoms>")
+    @app.route("/generate/<path:symptoms>")
     def generate(symptoms):
-        diagnostic = Diagnosor()      
-        result = diagnostic.generate(symptoms.split(","))
+        diagnostic = get_diagnostic()
+        parsed = [s.strip() for s in symptoms.split(",") if s.strip()]
+        result = diagnostic.generate(parsed)
         print("RESULT: ", result)
         return result
 
