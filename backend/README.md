@@ -1,20 +1,20 @@
+# Backend
 
-# Backend Service
+Flask API for SelfSense. Serves the symptom catalog and diagnosis endpoints, and loads the trained ensemble from `ml/`.
 
-This is the backend web service of the app. It is a Python Flask app.
+## Run
 
-# Run local development
+From the **repo root**:
 
-## Frontend - react.b
+```bash
+pip install flask flask-cors pandas scikit-learn joblib
+python -m flask --app backend run
+```
 
-    `cd react.b`
-    `npm run start`
+Windows helper:
 
-# BACKEND
-        
-        `flask --app backend run`, or 
-        `python -m flask --app backend run`, or
-        `./start-backend.bat`
+```bash
+.\start-backend.bat
+```
 
-        or
-        `gunicorn 'src:create_app()'`  (PROD mode)
+Listens on [http://127.0.0.1:5000](http://127.0.0.1:5000).
